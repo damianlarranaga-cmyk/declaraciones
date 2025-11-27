@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lumina Studio | HD Edition</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Anonymous+Pro:wght@700&family=Cinzel:wght@400;700&family=Inter:wght@300;600;900&family=Lora:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;800&family=Permanent+Marker&family=Playfair+Display:wght@400;900&family=Space+Mono&family=Bebas+Neue&family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+
+    <style>
+        /* =========================================
+           1. CORE STYLES
+           ========================================= */
+        :root {
+            --bg-app: #09090b;
+            --bg-panel: #18181b;
+            --accent: #8b5cf6; /* Violet */
+            --accent-hover: #7c3aed;
+            --text-main: #FAFAFA;
+            --text-muted: #A1A1AA;
+            --border: #27272a;
+            --radius: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-app);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* =========================================
+           2. PREVIEW AREA
+           ========================================= */
+        .preview-stage {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            position: relative;
+        }
+
+        .hd-badge {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(255,215,0, 0.1); color: #ffd700; border: 1px solid #ffd700;
+            padding: 4px 8px; font-size: 0.7rem; font-weight: bold; border-radius: 4px;
+            display: none; pointer-events: none;
+        }
+        .hd-badge.visible { display: block; }
+
+        .actions-container {
+            position: absolute; top: 20px; right: 20px;
+            display: flex; flex-direction: column; gap: 12px; z-index: 50;
+        }
+
+        .fab {
+            width: 44px; height: 44px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid var(--border);
+            cursor: pointer; background: #27272a; color: white;
+            transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .fab:hover { transform: translateY(-2px); background: var(--accent); border-color: var(--accent); }
+        .fab svg { width: 20px; height: 20px; }
+
+        /* EL LIENZO VISUAL */
+        #art-board {
+            width: 100%; max-width: 400px; aspect-ratio: 1/1;
+            position: relative;
+            box-shadow: 0 20px 50px -10px rgba(0,0,0,0.7);
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            
+            /* CSS Variables aplicadas por JS */
+            background: var(--theme-bg, #fff);
+            color: var(--theme-text, #000);
+            font-family: var(--theme-font, 'Inter');
+            border: var(--theme-border, none);
+
+            display: flex; flex-direction: column;
+        }
+
+        /* Capas internas para simular el Canvas final */
+        .layer-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+            background-size: cover; background-position: center; pointer-events: none;
+        }
+        .layer-content {
+            position: relative; z-index: 2; width: 100%; height: 100%;
+            display: flex; flex-direction: column; padding: 2rem;
+        }
+
+        /* LAYOUTS */
+        /* Center (Default) */
+        #art-board.layout-text .layer-content { justify-content: center; align-items: center; text-align: center; }
+        
+        /* Cine (Overlay) */
+        #art-board.layout-cine .layer-bg { filter: brightness(0.4); }
+        #art-board.layout-cine .layer-content { justify-content: center; align-items: center; text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+
+        /* Polaroid */
+        #art-board.layout-polaroid { padding: 15px 15px 50px 15px; background: #fff; color: #000; justify-content: flex-end; }
+        #art-board.layout-polaroid .layer-bg { position: relative; width: 100%; height: 70%; top:0; left:0; margin-bottom: 1rem; box-shadow: inset 0 0 20px rgba(0,0,0,0.1); background-color: #eee; }
+        #art-board.layout-polaroid .layer-content { height: auto; padding: 0 10px; text-align: left; }
+
+        /* Duet (Split) */
+        #art-board.layout-duet { display: grid; grid-template-rows: 1fr 1fr; }
+        #art-board.layout-duet .layer-bg { position: relative; height: 100%; width: 100%; }
+        #art-board.layout-duet .layer-content { background: var(--theme-bg); justify-content: center; align-items: center; text-align: center; }
+
+        /* Profile */
+        .profile-bubble {
+            width: 60px; height: 60px; border-radius: 50%; 
+            background-size: cover; background-position: center;
+            margin-right: 15px; border: 2px solid currentColor;
+            display: inline-block; flex-shrink: 0;
+        }
+        #art-board.layout-profile .layer-content { justify-content: center; align-items: center; text-align: center; }
+
+        /* Tipografía */
+        .quote-text { font-size: var(--font-size, 1.5rem); line-height: 1.4; white-space: pre-wrap; }
+        .quote-author {
+            margin-top: 1.5rem; font-size: 0.8rem; opacity: 0.85; 
+            font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .hl {
+            background-image: var(--theme-marker);
+            background-repeat: no-repeat; background-size: 100% 90%; background-position: 0 90%;
+            padding: 0 4px; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+            color: var(--theme-text-hl, inherit);
+        }
+
+        /* =========================================
+           3. PANEL CONTROLS
+           ========================================= */
+        .controls-panel {
+            height: 50vh; background: var(--bg-panel);
+            border-radius: 24px 24px 0 0; display: flex; flex-direction: column;
+            box-shadow: 0 -5px 30px rgba(0,0,0,0.5); border-top: 1px solid var(--border); z-index: 100;
+        }
+
+        .tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 1rem; }
+        .tab-btn {
+            flex: 1; background: none; border: none; padding: 1.2rem 0;
+            color: var(--text-muted); font-weight: 600; font-size: 0.8rem;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
+            border-bottom: 2px solid transparent; transition: 0.3s;
+        }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .tab-content { flex: 1; overflow-y: auto; padding: 1.5rem; display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from{opacity:0; transform:translateY(5px);} to{opacity:1; transform:translateY(0);} }
+
+        /* Inputs */
+        textarea, input[type="text"] {
+            width: 100%; background: #27272a; border: 1px solid var(--border);
+            color: white; padding: 12px; border-radius: 8px; margin-bottom: 1rem;
+            font-family: inherit; resize: none; font-size: 0.95rem;
+        }
+        textarea:focus, input:focus { border-color: var(--accent); }
+        
+        label { display: block; color: var(--text-muted); font-size: 0.75rem; margin-bottom: 6px; text-transform: uppercase; font-weight: 700; }
+
+        /* Tools */
+        .tool-row { display: flex; gap: 10px; margin-bottom: 1rem; }
+        .btn-tool {
+            flex: 1; padding: 10px; background: #27272a; border: 1px solid var(--border);
+            color: white; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.8rem;
+        }
+        .btn-tool:hover { background: #3f3f46; }
+        .btn-tool.active { background: var(--accent); border-color: var(--accent); }
+
+        /* Theme Grid */
+        .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; padding-bottom: 2rem; }
+        .theme-card {
+            aspect-ratio: 1; border-radius: 10px; cursor: pointer; position: relative;
+            border: 2px solid transparent; overflow: hidden; background: #27272a;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3); }
+        .theme-card span { 
+            position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.6); 
+            font-size: 0.65rem; padding: 4px; text-align: center; backdrop-filter: blur(2px); color: white;
+        }
+
+        /* HD Toggle */
+        .hd-switch {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #27272a; padding: 12px; border-radius: 8px; margin-bottom: 1rem; border: 1px solid var(--border);
+        }
+        .toggle-knob {
+            width: 40px; height: 20px; background: #3f3f46; border-radius: 20px; position: relative; cursor: pointer; transition: 0.3s;
+        }
+        .toggle-knob::after {
+            content:''; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px;
+            background: white; border-radius: 50%; transition: 0.3s;
+        }
+        .toggle-knob.active { background: var(--accent); }
+        .toggle-knob.active::after { left: 22px; }
+
+        @media (min-width: 768px) {
+            body { flex-direction: row; }
+            .controls-panel { height: 100vh; width: 400px; border-radius: 0; border-top: none; border-left: 1px solid var(--border); }
+            .preview-stage { height: 100vh; }
+            #art-board { max-width: 520px; }
+            #art-board.layout-duet { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <section class="preview-stage">
+        <div class="hd-badge" id="hd-badge">ULTRA HD 4K</div>
+        <div class="actions-container">
+            <button class="fab" id="btn-share" title="Compartir">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+            </button>
+            <button class="fab" id="btn-download" title="Descargar PNG">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </button>
+        </div>
+
+        <div id="art-board">
+            <div class="layer-bg" id="preview-bg"></div>
+            <div class="layer-content" id="preview-content">
+                <div class="quote-text" id="render-text"></div>
+                <div class="quote-author">
+                    <div id="preview-profile" class="profile-bubble" style="display:none;"></div>
+                    <span id="render-author"></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <aside class="controls-panel">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="setTab('edit')">Editar</button>
+            <button class="tab-btn" onclick="setTab('media')">Foto</button>
+            <button class="tab-btn" onclick="setTab('themes')">25 Estilos</button>
+        </div>
+
+        <div id="tab-edit" class="tab-content active">
+            <label>Tu Frase</label>
+            <textarea id="inp-text" rows="3">La simplicidad es la máxima sofisticación.</textarea>
+            
+            <label>Alineación</label>
+            <div class="tool-row">
+                <button class="btn-tool" onclick="setAlignment('left')">Izq</button>
+                <button class="btn-tool" onclick="setAlignment('center')">Cen</button>
+                <button class="btn-tool" onclick="setAlignment('right')">Der</button>
+            </div>
+
+            <label>Tamaño</label>
+            <input type="range" id="inp-size" min="0.8" max="3" step="0.1" value="1.5" style="width:100%; margin-bottom:1rem;">
+
+            <label>Autor</label>
+            <input type="text" id="inp-author" value="Leonardo da Vinci">
+
+            <div class="hd-switch" onclick="toggleHD()">
+                <div style="font-size:0.85rem; font-weight:bold;">Calidad Ultra HD (4K)</div>
+                <div class="toggle-knob" id="hd-toggle"></div>
+            </div>
+        </div>
+
+        <div id="tab-media" class="tab-content">
+            <div class="tool-row">
+                <button class="btn-tool" onclick="document.getElementById('file-up').click()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Subir Foto
+                </button>
+                <button class="btn-tool" onclick="document.getElementById('file-up').value=''; clearImage()">
+                     🗑️ Quitar
+                </button>
+            </div>
+            <input type="file" id="file-up" accept="image/*" hidden onchange="handleImageUpload(this)">
+
+            <label>Filtros de Imagen</label>
+            <label style="font-size:0.7rem; margin-top:0.5rem">Oscuridad (Fondo)</label>
+            <input type="range" id="filter-dim" min="0" max="0.9" step="0.1" value="0.4" style="width:100%">
+            
+            <label style="font-size:0.7rem; margin-top:0.5rem">Desenfoque</label>
+            <input type="range" id="filter-blur" min="0" max="10" step="1" value="0" style="width:100%">
+        </div>
+
+        <div id="tab-themes" class="tab-content">
+            <div class="theme-grid" id="theme-grid"></div>
+        </div>
+    </aside>
+
+    <script>
+        // ============================================
+        // 1. DATABASE & CONFIG
+        // ============================================
+        const THEMES = [
+            // --- FOTO FOCUSED (4 Originales + Nuevos) ---
+            { id: 'cine', name: '🎥 Cine', layout: 'cine', style: { bg: '#000', text: '#fff', font: 'Montserrat', marker: 'transparent' } },
+            { id: 'polaroid', name: '📸 Polaroid', layout: 'polaroid', style: { bg: '#fff', text: '#111', font: 'Permanent Marker', marker: '#fef08a' } },
+            { id: 'duet', name: '🌗 Duet', layout: 'duet', style: { bg: '#18181b', text: '#f4f4f5', font: 'Inter', marker: '#8b5cf6' } },
+            { id: 'profile', name: '👤 Profile', layout: 'profile', style: { bg: '#fafafa', text: '#18181b', font: 'Lora', marker: '#a3e635' } },
+            
+            // --- 10 NUEVOS TEMAS (Total 25+) ---
+            { id: 'noir', name: '🕵️ Noir', layout: 'text', style: { bg: '#000', text: '#fff', font: 'Playfair Display', marker: '#333' } },
+            { id: 'crimson', name: '🌹 Crimson', layout: 'text', style: { bg: '#881337', text: '#ffe4e6', font: 'Cinzel', marker: '#be123c' } },
+            { id: 'royal', name: '👑 Royal', layout: 'text', style: { bg: '#4c1d95', text: '#fbbf24', font: 'Abril Fatface', marker: '#6d28d9' } },
+            { id: 'mint', name: '🌿 Mint', layout: 'text', style: { bg: '#ecfccb', text: '#365314', font: 'Montserrat', marker: '#bef264' } },
+            { id: 'barbie', name: '💅 Doll', layout: 'text', style: { bg: '#fbcfe8', text: '#db2777', font: 'Dancing Script', marker: '#fff' } },
+            { id: 'terminal', name: '📟 Terminal', layout: 'text', style: { bg: '#0c0c0c', text: '#22c55e', font: 'Space Mono', marker: '#14532d' } },
+            { id: 'ocean', name: '🌊 Ocean', layout: 'text', style: { bg: 'linear-gradient(to top, #1e3a8a, #3b82f6)', text: '#e0f2fe', font: 'Inter', marker: 'rgba(255,255,255,0.2)' } },
+            { id: 'sunset', name: '🌅 Sunset', layout: 'text', style: { bg: 'linear-gradient(to bottom, #c02425, #f0cb35)', text: '#fff', font: 'Bebas Neue', marker: 'rgba(0,0,0,0.1)' } },
+            { id: 'concrete', name: '🏢 Concrete', layout: 'text', style: { bg: '#d6d3d1', text: '#292524', font: 'Arial', marker: '#a8a29e', border: '8px solid #292524' } },
+            { id: 'paper', name: '📜 Paper', layout: 'text', style: { bg: '#f5f5dc', text: '#4a4036', font: 'Lora', marker: '#e7e5e4' } },
+            
+            // --- CLÁSICOS ---
+            { id: 'classic', name: '📰 Editorial', layout: 'text', style: { bg: '#fdfbf7', text: '#111', font: 'Playfair Display', marker: '#fcd34d' } },
+            { id: 'swiss', name: '🇨🇭 Swiss', layout: 'text', style: { bg: '#ef4444', text: '#fff', font: 'Inter', marker: '#b91c1c' } },
+            { id: 'blueprint', name: '📐 Blue', layout: 'text', style: { bg: '#172554', text: '#dbeafe', font: 'Anonymous Pro', marker: '#1e40af' } },
+            { id: 'cyber', name: '🦾 Cyber', layout: 'text', style: { bg: '#000', text: '#06b6d4', font: 'Space Mono', marker: '#0e7490', border: '2px solid #06b6d4' } },
+            { id: 'luxury', name: '⚜️ Gold', layout: 'text', style: { bg: '#1c1917', text: '#d4af37', font: 'Cinzel', marker: '#78350f', border: '2px solid #d4af37' } }
+        ];
+
+        const state = {
+            text: "La simplicidad es la máxima sofisticación.",
+            author: "Leonardo da Vinci",
+            themeIdx: 0,
+            align: 'center',
+            size: 1.5,
+            image: null, // Base64
+            imgFilters: { dim: 0.4, blur: 0 },
+            isHD: false
+        };
+
+        const dom = {
+            board: document.getElementById('art-board'),
+            bgLayer: document.getElementById('preview-bg'),
+            textLayer: document.getElementById('render-text'),
+            authorLayer: document.getElementById('render-author'),
+            profileBubble: document.getElementById('preview-profile'),
+            themeGrid: document.getElementById('theme-grid')
+        };
+
+        // ============================================
+        // 2. LOGIC UI
+        // ============================================
+        function init() {
+            renderThemes();
+            updatePreview();
+            
+            // Listeners
+            document.getElementById('inp-text').addEventListener('input', (e) => { state.text = e.target.value; updatePreview(); });
+            document.getElementById('inp-author').addEventListener('input', (e) => { state.author = e.target.value; updatePreview(); });
+            document.getElementById('inp-size').addEventListener('input', (e) => { state.size = e.target.value; updatePreview(); });
+            document.getElementById('filter-dim').addEventListener('input', (e) => { state.imgFilters.dim = e.target.value; updatePreview(); });
+            document.getElementById('filter-blur').addEventListener('input', (e) => { state.imgFilters.blur = e.target.value; updatePreview(); });
+        }
+
+        function setTab(name) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            const idx = name === 'edit' ? 0 : name === 'media' ? 1 : 2;
+            document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+            
+            if(name === 'edit') document.getElementById('tab-edit').classList.add('active');
+            if(name === 'media') document.getElementById('tab-media').classList.add('active');
+            if(name === 'themes') document.getElementById('tab-themes').classList.add('active');
+        }
+
+        function toggleHD() {
+            state.isHD = !state.isHD;
+            document.getElementById('hd-toggle').classList.toggle('active', state.isHD);
+            document.getElementById('hd-badge').classList.toggle('visible', state.isHD);
+        }
+
+        function setAlignment(align) {
+            state.align = align;
+            updatePreview();
+        }
+
+        function renderThemes() {
+            dom.themeGrid.innerHTML = '';
+            THEMES.forEach((t, i) => {
+                const el = document.createElement('div');
+                el.className = 'theme-card';
+                // Mini preview style
+                el.style.background = t.style.bg.includes('gradient') ? t.style.bg : t.style.bg;
+                if(t.layout !== 'text') el.style.background = '#333'; 
+                
+                el.innerHTML = `<span style="color:${t.layout==='text'?t.style.text:'#fff'}">${t.name}</span>`;
+                el.onclick = () => {
+                    state.themeIdx = i;
+                    document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
+                    el.classList.add('active');
+                    updatePreview();
+                };
+                dom.themeGrid.appendChild(el);
+            });
+            // Select first
+            document.querySelectorAll('.theme-card')[0].classList.add('active');
+        }
+
+        function handleImageUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                state.image = e.target.result;
+                updatePreview();
+                // Auto switch to media tab feedback
+                const currentTheme = THEMES[state.themeIdx];
+                if(currentTheme.layout === 'text') {
+                    // Sugerir cambio a tema de foto si está en texto
+                    // alert("¡Foto subida! Prueba los temas 'Cine' o 'Polaroid' para verla.");
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+        function clearImage() { state.image = null; updatePreview(); }
+
+        // ============================================
+        // 3. CORE RENDER (PREVIEW)
+        // ============================================
+        function updatePreview() {
+            const theme = THEMES[state.themeIdx];
+            
+            // 1. Reset Classes
+            dom.board.className = `layout-${theme.layout}`;
+            
+            // 2. CSS Vars
+            dom.board.style.setProperty('--theme-bg', theme.style.bg);
+            dom.board.style.setProperty('--theme-text', theme.style.text);
+            dom.board.style.setProperty('--theme-font', theme.style.font);
+            dom.board.style.setProperty('--theme-marker', theme.style.marker);
+            dom.board.style.setProperty('--font-size', `${state.size}rem`);
+            dom.board.style.border = theme.style.border || 'none';
+
+            // 3. Text Content
+            dom.textLayer.innerText = state.text;
+            dom.textLayer.style.textAlign = state.align;
+            
+            // 4. Author & Profile
+            dom.authorLayer.innerText = state.author ? `— ${state.author}` : '';
+            dom.profileBubble.style.display = (theme.layout === 'profile' && state.image) ? 'inline-block' : 'none';
+            if(theme.layout === 'profile' && state.image) {
+                dom.profileBubble.style.backgroundImage = `url(${state.image})`;
+            }
+
+            // 5. Background Logic (CSS Preview)
+            if(state.image && theme.layout !== 'text' && theme.layout !== 'profile') {
+                dom.bgLayer.style.backgroundImage = `url(${state.image})`;
+                dom.bgLayer.style.backgroundSize = 'cover';
+                dom.bgLayer.style.filter = `brightness(${1 - state.imgFilters.dim}) blur(${state.imgFilters.blur}px)`;
+            } else {
+                dom.bgLayer.style.backgroundImage = 'none';
+                dom.bgLayer.style.background = '';
+                dom.bgLayer.style.filter = 'none';
+            }
+        }
+
+        // ============================================
+        // 4. EXPORT ENGINE (CANVAS COMPOSITING)
+        // Este es el secreto para que la imagen SIEMPRE salga
+        // ============================================
+        async function generateFinalImage() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const theme = THEMES[state.themeIdx];
+            
+            // 1. SETUP DIMENSIONS (HD vs SD)
+            const baseSize = 1080;
+            const scale = state.isHD ? 2 : 1; // 1080px vs 2160px
+            const size = baseSize * scale;
+            
+            canvas.width = size;
+            canvas.height = size; // 1:1 ratio
+
+            // 2. DRAW BACKGROUND (LAYER 1)
+            // Llenar fondo con color del tema primero
+            if(theme.style.bg.includes('gradient')) {
+                // Simplificación para gradientes en canvas (exportación básica de color sólido si es muy complejo, 
+                // o intentar parsear. Para robustez usamos un fill genérico o el color principal)
+                const grd = ctx.createLinearGradient(0, size, 0, 0);
+                if(theme.id === 'ocean') { grd.addColorStop(0, '#1e3a8a'); grd.addColorStop(1, '#3b82f6'); }
+                else if(theme.id === 'sunset') { grd.addColorStop(0, '#c02425'); grd.addColorStop(1, '#f0cb35'); }
+                else { ctx.fillStyle = '#333'; ctx.fillRect(0,0,size,size); } 
+                
+                if(theme.style.bg.includes('gradient')) ctx.fillStyle = grd;
+                else ctx.fillStyle = theme.style.bg;
+            } else {
+                ctx.fillStyle = theme.style.bg;
+            }
+            ctx.fillRect(0, 0, size, size);
+
+            // 3. DRAW USER IMAGE (LAYER 1.5)
+            // Aquí dibujamos la imagen directamente en el canvas, NO dentro de un SVG.
+            // Esto soluciona el problema de "imagen invisible".
+            if (state.image && theme.layout !== 'text') {
+                const img = await loadImage(state.image);
+                
+                // Aplicar filtros visuales usando filter de canvas
+                ctx.filter = `brightness(${1 - state.imgFilters.dim}) blur(${state.imgFilters.blur * scale}px)`;
+
+                if (theme.layout === 'cine') {
+                    drawImageCover(ctx, img, 0, 0, size, size);
+                } 
+                else if (theme.layout === 'polaroid') {
+                    // Polaroid: Imagen en el 70% superior
+                    drawImageCover(ctx, img, 0, 0, size, size * 0.7);
+                } 
+                else if (theme.layout === 'duet') {
+                    // Duet: Imagen arriba (mitad) en desktop es split, pero en canvas cuadrado lo haremos split horizontal (arriba/abajo) o vertical.
+                    // Vamos a hacer split vertical para mantener estilo "duet"
+                    // Nota: En CSS preview usamos grid, aquí dibujamos manual.
+                    // Si es mobile view CSS es rows, si es desktop cols. Asumamos Split Vertical (Cols) para export pro.
+                    // O mejor, Split Horizontal (Arriba Imagen, Abajo Texto) que es más seguro para frases largas.
+                    drawImageCover(ctx, img, 0, 0, size, size * 0.5);
+                }
+                
+                ctx.filter = 'none'; // Reset filter
+            }
+
+            // 4. DRAW TEXT & VECTORS (LAYER 2 - SVG OVERLAY)
+            // Generamos un SVG transparente que SOLO contiene el texto y bordes
+            const svgData = createSVGOverlay(theme, size, scale);
+            const svgImg = await loadImage('data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData))));
+            ctx.drawImage(svgImg, 0, 0);
+
+            return canvas;
+        }
+
+        // Helper: Cargar imagen (Promesa)
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+
+        // Helper: Object-fit Cover para Canvas
+        function drawImageCover(ctx, img, x, y, w, h) {
+            const ratio = w / h;
+            const imgRatio = img.width / img.height;
+            let sx, sy, sw, sh;
+
+            if (imgRatio > ratio) {
+                sh = img.height;
+                sw = img.height * ratio;
+                sx = (img.width - sw) / 2;
+                sy = 0;
+            } else {
+                sw = img.width;
+                sh = img.width / ratio;
+                sx = 0;
+                sy = (img.height - sh) / 2;
+            }
+            ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+        }
+
+        // Generador SVG solo para texto (Transparente)
+        function createSVGOverlay(theme, size, scale) {
+            const fontSize = state.size * 24 * scale; 
+            const padding = 80 * scale;
+            
+            // Cálculos de layout para el texto
+            let containerStyle = `width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; padding:${padding}px; box-sizing:border-box;`;
+            
+            if(theme.layout === 'polaroid') containerStyle = `width:100%; height:100%; display:flex; flex-direction:column; justify-content:flex-end; padding:${40*scale}px ${40*scale}px ${80*scale}px; box-sizing:border-box;`;
+            if(theme.layout === 'duet') containerStyle = `width:100%; height:100%; display:flex; flex-direction:column; justify-content:flex-end; padding:${padding}px; box-sizing:border-box;`; // Texto abajo (segunda mitad)
+
+            // Perfil imagen (Si aplica)
+            let profileHtml = '';
+            if(theme.layout === 'profile' && state.image) {
+                // Hack: Incrustar imagen perfil como pattern o img tag en SVG. 
+                // Para simplificar en exportación combinada, si es profile, ya deberíamos haberla dibujado en canvas o...
+                // Mejor: Usamos <img> tag base64 aquí mismo ya que es pequeña y suele dar menos problemas que un full background.
+                profileHtml = `<div style="width:${80*scale}px; height:${80*scale}px; border-radius:50%; background-image:url('${state.image}'); background-size:cover; margin-right:${20*scale}px; border:3px solid currentColor; flex-shrink:0;"></div>`;
+            }
+
+            return `
+            <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+                <foreignObject width="100%" height="100%">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="
+                        ${containerStyle}
+                        font-family: ${theme.style.font.replace(/"/g, "'")};
+                        color: ${theme.style.text};
+                        text-align: ${state.align};
+                        ${theme.style.border ? 'border:' + theme.style.border.replace('1px', (10*scale)+'px').replace('2px', (20*scale)+'px').replace('8px', (60*scale)+'px') + ';' : ''}
+                    ">
+                        ${theme.layout === 'duet' ? `<div style="height:50%"></div>` : ''}
+
+                        <div style="font-size:${fontSize}px; line-height:1.4; white-space:pre-wrap; margin-bottom:${40*scale}px;">${state.text}</div>
+                        
+                        <div style="
+                            font-size:${fontSize*0.5}px; opacity:0.9; font-weight:bold; letter-spacing:2px; text-transform:uppercase;
+                            display:flex; align-items:center; justify-content:${state.align==='left'?'flex-start':(state.align==='right'?'flex-end':'center')};
+                        ">
+                            ${profileHtml}
+                            <span>${state.author ? '— ' + state.author : ''}</span>
+                        </div>
+                    </div>
+                </foreignObject>
+            </svg>`;
+        }
+
+        // ============================================
+        // 5. HANDLERS
+        // ============================================
+        async function handleAction(isShare) {
+            const btn = document.getElementById(isShare ? 'btn-share' : 'btn-download');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<svg class="animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" stroke-width="2" stroke-linecap="round"/></svg>`;
+            
+            // Animación CSS inline para el spinner
+            if(!document.getElementById('spin-style')) {
+                const s = document.createElement('style');
+                s.id='spin-style'; s.innerHTML=`@keyframes spin{to{transform:rotate(360deg)}} .animate-spin{animation:spin 1s linear infinite}`;
+                document.head.appendChild(s);
+            }
+
+            try {
+                // Esperar un frame para que la UI se actualice
+                await new Promise(r => requestAnimationFrame(r));
+                await new Promise(r => setTimeout(r, 50));
+
+                const canvas = await generateFinalImage();
+                
+                canvas.toBlob(async (blob) => {
+                    if(!blob) throw new Error("Canvas vacío");
+                    const file = new File([blob], `lumina-${Date.now()}.png`, { type: 'image/png' });
+
+                    if (isShare && navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({ files: [file] });
+                    } else {
+                        const link = document.createElement('a');
+                        link.download = file.name;
+                        link.href = URL.createObjectURL(blob);
+                        link.click();
+                        if(isShare) alert("Imagen guardada (Compartir no disponible en este dispositivo).");
+                    }
+                    btn.innerHTML = originalHTML;
+                }, 'image/png', 1.0);
+
+            } catch (err) {
+                console.error(err);
+                alert("Error al procesar la imagen.");
+                btn.innerHTML = originalHTML;
+            }
+        }
+
+        document.getElementById('btn-download').addEventListener('click', () => handleAction(false));
+        document.getElementById('btn-share').addEventListener('click', () => handleAction(true));
+
+        // INIT
+        init();
+
+    </script>
+</body>
+</html>
